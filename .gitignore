@@ -1,0 +1,25 @@
+# Ambiente virtual
+.venv/
+venv/
+
+# Cache do Python
+**/__pycache__/
+*.py[cod]
+
+# Configurações do VS Code
+.vscode/
+
+# Variáveis de ambiente (Segurança)
+.env
+
+# Metadados e Builds
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Arquivos do Sistema Operacional
+*.log
+.DS_Store
+Thumbs.db
+
+v1

@@ -1,0 +1,7 @@
+# reembolso
+
+Política de reembolso — Aurora Tech
+
+Despesas de viagem acima de R$ 80 exigem nota fiscal.
+Pedágio e metrô não precisam de comprovante se o valor for menor que R$ 25 por dia.
+O prazo para enviar o pedido no Helios é de 10 dias úteis após o retorno.

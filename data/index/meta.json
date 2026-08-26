@@ -1,0 +1,23 @@
+{
+  "embedding_kind": "tfidf",
+  "embedding_dim": 1893,
+  "chunk_count": 379,
+  "sources": [
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\arquitetura_helios.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\guia_compostagem_campinas.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\guideline_deploy_producao.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\hierarquia_clientes_aurora.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\manual_aurora.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\metricas_corporativas_aurora.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\orcamento_nortealimentos_2026.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\perfil_subcliente_lumen.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\perfil_terciario_biolumen.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\politica_plantao_v2024-03.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\politica_plantao_v2025-08.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\quem_somos_aurora.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\reembolso.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\relatorio_engenharia_q2_2026.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\runbook_incidente_p1.md",
+    "C:\\Users\\Usuario\\Projects\\project_rag\\data\\documents\\sop_ferias_helios.md"
+  ]
+}
