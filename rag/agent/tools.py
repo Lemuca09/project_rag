@@ -22,15 +22,19 @@ def build_rag_tools(
         return retrieval.retrieve(question, history=history_fn())
 
     def draft_answer(question: str, hits: list[RetrievedHit]) -> str:
+        latest_year, extra_terms = retrieval._corpus_signals()
         return extract_answer(
             question,
             hits,
             mmr_lambda=settings.mmr_lambda,
             dup_threshold=settings.dedup_jaccard,
+            latest_year=latest_year,
+            extra_terms=extra_terms,
+            graph=retrieval.index.vocab,
         )
 
     def verify(question: str, answer: str, hits: list[RetrievedHit]) -> AnswerVerdict:
-        return quality.verify_answer(question, answer, hits)
+        return quality.verify_answer(question, answer, hits, graph=retrieval.index.vocab)
 
     return [
         ToolSpec(

@@ -9,6 +9,7 @@ from rag.retrieval.hybrid import hybrid_search
 from rag.retrieval.quality import QualityGate, QualityReport
 from rag.retrieval.query_rewriter import QueryRewriter, RewrittenQuery
 from rag.retrieval.reranker import rerank
+from rag.retrieval.route import scan_latest_year
 from rag.store.index import RagIndex, RetrievedHit
 
 
@@ -33,6 +34,15 @@ class RetrievalPipeline:
         self.settings = settings
         self.rewriter = rewriter
         self.quality = quality
+        self._latest_year: str | None = None
+        self._scanned = False
+        self._last_keywords: list[str] = []
+
+    def _corpus_signals(self) -> tuple[str | None, list[str]]:
+        if not self._scanned:
+            self._latest_year = scan_latest_year(self.index.chunks)
+            self._scanned = True
+        return self._latest_year, self._last_keywords
 
     def retrieve(
         self,
@@ -59,14 +69,21 @@ class RetrievalPipeline:
                 f"tentativa {attempts}: query='{rewritten.search_query}' ({rewritten.reason})"
             )
             hits = hybrid_search(self.index, rewritten.search_query, self.settings)
+            latest_year, _ = self._corpus_signals()
             hits = rerank(
                 rewritten.search_query,
                 hits,
                 top_k=self.settings.rerank_top_k,
                 mmr_lambda=self.settings.mmr_lambda,
                 frame=rewritten.frame,
+                route_query=question,
+                latest_year=latest_year,
+                graph=self.index.vocab,
             )
-            quality = self.quality.evaluate_retrieval(rewritten.original, hits)
+            self._last_keywords = rewritten.keywords
+            quality = self.quality.evaluate_retrieval(
+                rewritten.original, hits, graph=self.index.vocab
+            )
             trace.append(
                 f"qualidade={quality.score:.2f} ok={quality.ok} | " + "; ".join(quality.reasons)
             )

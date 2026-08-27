@@ -5,6 +5,7 @@ venv/
 # Cache do Python
 **/__pycache__/
 *.py[cod]
+.gitignore
 
 # Configurações do VS Code
 .vscode/

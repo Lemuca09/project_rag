@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from rag.text import FILLER_PT, tokenize, unique_terms
@@ -34,21 +35,25 @@ class QueryRewriter:
         if len(kept) < 2 and history:
             kept = list(dict.fromkeys(kept + unique_terms(history[-1])))
         if hint:
-            kept = list(dict.fromkeys(kept + tokenize(hint)))
+            kept = list(
+                dict.fromkeys(
+                    kept
+                    + [
+                        t
+                        for t in tokenize(hint)
+                        if t not in FILLER_PT and t not in frame.drop
+                    ]
+                )
+            )
 
         extra: list[str] = []
         notes = list(frame.notes)
         graph = graph or TermGraph()
-        people = _is_people(kept, question)
+        kept = _drop_clashing(kept, graph, notes)
 
-        if people:
-            for alt in ("headcount", "colaboradores", "pessoas"):
-                if alt not in kept and graph.has(alt):
-                    extra.append(alt)
-            kept = [t for t in kept if t != "aurora"]
-            notes.append("pessoas → headcount")
-
-        if frame.kind == "quantity_period" and frame.year:
+        if frame.kind == "procedure":
+            notes.append("procedimento: sem expansao do grafo")
+        elif frame.kind == "quantity_period" and frame.year:
             qty = [
                 t
                 for t in kept
@@ -74,9 +79,12 @@ class QueryRewriter:
             content = [t for t in kept if t != frame.year]
             raw = graph.expand(content, k=6) if content else []
             year_nb = graph.neighbor_set(frame.year, k=12)
-            extra.extend(t for t in raw if t in year_nb and t not in {"indicador", "q1", "q2", "q3", "q4"})
-        elif kept and not people:
+            extra.extend(t for t in raw if t in year_nb)
+        elif kept:
             extra.extend(graph.expand(kept, k=8))
+
+        extra = _without_unasked_years(extra, frame)
+        extra = _without_more_common(extra, kept, graph)
 
         keywords = unique_terms(" ".join(kept + extra) if (kept or extra) else cleaned)
         keywords = [k for k in keywords if k not in frame.drop]
@@ -91,21 +99,32 @@ class QueryRewriter:
         )
 
 
-_PEOPLE_TERMS = {
-    "funcionarios",
-    "funcionario",
-    "pessoas",
-    "pessoa",
-    "colaboradores",
-    "colaborador",
-    "trabalham",
-    "trabalha",
-    "headcount",
-}
+def _without_more_common(extra: list[str], kept: list[str], graph: TermGraph) -> list[str]:
+    if not graph.n_docs or not kept:
+        return extra
+    rare = graph.rare_terms(kept)
+    cap = max((graph.df.get(t, 0) for t in rare), default=0)
+    return [t for t in extra if graph.df.get(t, 0) <= cap]
 
 
-def _is_people(kept: list[str], question: str) -> bool:
-    if any(t in _PEOPLE_TERMS for t in kept):
-        return True
-    n = question.lower()
-    return any(stem in n for stem in ("funcion", "colabor", "pessoas", "headcount", "trabalh"))
+def _without_unasked_years(extra: list[str], frame: QuestionFrame) -> list[str]:
+    out: list[str] = []
+    for token in extra:
+        year = re.fullmatch(r"(?:fy)?(20\d{2})", token)
+        if year and year.group(1) != frame.year:
+            continue
+        out.append(token)
+    return out
+
+
+def _drop_clashing(kept: list[str], graph: TermGraph, notes: list[str]) -> list[str]:
+    if len(kept) < 2 or not graph.n_docs:
+        return kept
+    filtered: list[str] = []
+    for token in kept:
+        others = [t for t in kept if t != token]
+        if graph.sense_clash(token, others):
+            notes.append(f"{token} removido (choque de sentido)")
+            continue
+        filtered.append(token)
+    return filtered or kept

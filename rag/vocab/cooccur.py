@@ -48,10 +48,23 @@ class TermGraph:
     def has(self, term: str) -> bool:
         return term in self.neighbors or term in self.df
 
+    def df_ratio(self, term: str) -> float:
+        if not self.n_docs:
+            return 0.0
+        return self.df.get(term, 0) / self.n_docs
+
+    def is_common(self, term: str, *, max_df: float = 0.15) -> bool:
+        return self.df_ratio(term) >= max_df
+
+    def rare_terms(self, terms: list[str], *, max_df: float = 0.15) -> list[str]:
+        rare = [t for t in terms if not self.is_common(t, max_df=max_df)]
+        return rare or list(terms)
+
     def expand(self, terms: list[str], *, k: int = 8) -> list[str]:
         weights: dict[str, float] = {}
+        seeds = self.rare_terms(terms)
         seed = set(terms)
-        for term in terms:
+        for term in seeds:
             for other, w in self.neighbors.get(term, [])[:k]:
                 if other in seed:
                     continue

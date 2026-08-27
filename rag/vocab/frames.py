@@ -28,6 +28,11 @@ _PERIOD = re.compile(
 )
 _INCIDENT_ID = re.compile(r"\bp1-\d{4}-\d+\b", re.IGNORECASE)
 _INCIDENT_WORD = re.compile(r"\b(incidente|severidade|postmortem|ack)\b", re.IGNORECASE)
+_HOWTO = re.compile(
+    r"\b(como (fazer|executar|rodar|aplicar|montar)|passo a passo|"
+    r"checklist|procedimento)\b",
+    re.IGNORECASE,
+)
 
 _LIGHT = {"trata", "tratar", "sobre", "ser", "fazer"}
 
@@ -38,6 +43,7 @@ class QuestionFrame:
     period_n: int | None = None
     year: str | None = None
     period_token: str | None = None
+    people: bool = False
     drop: tuple[str, ...] = ()
     notes: list[str] = field(default_factory=list)
 
@@ -60,28 +66,36 @@ def parse_frame(question: str) -> QuestionFrame:
             period_n=digit,
             year=pyear or year,
             period_token=token,
-            drop=_LIGHT,
+            people=people,
+            drop=tuple(_LIGHT | ({"trabalham", "trabalha"} if people else set())),
             notes=[f"quantidade + período {token} {pyear}"],
         )
     if people or quantity:
         return QuestionFrame(
             kind="quantity",
             year=year,
-            drop=_LIGHT,
+            people=people,
+            drop=tuple(_LIGHT | ({"trabalham", "trabalha"} if people else set())),
             notes=["quadro de quantidade" + (" de pessoas" if people else "")],
         )
     if _DEFINITION.search(question) or _DEFINITION.search(n):
         return QuestionFrame(
             kind="definition",
             year=year,
-            drop=_LIGHT,
+            drop=tuple(_LIGHT),
             notes=["definição"],
         )
     if year:
         return QuestionFrame(
             kind="generic",
             year=year,
-            drop=_LIGHT,
+            drop=tuple(_LIGHT),
             notes=[f"ano explícito ({year})"],
+        )
+    if _HOWTO.search(n):
+        return QuestionFrame(
+            kind="procedure",
+            drop=tuple(_LIGHT),
+            notes=["procedimento / how-to"],
         )
     return QuestionFrame(kind="generic")

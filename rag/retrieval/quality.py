@@ -8,6 +8,7 @@ from rag.dedup import answer_redundancy
 from rag.dedup import jaccard
 from rag.store.index import RetrievedHit
 from rag.text import FILLER_PT, normalize, tokenize, unique_terms
+from rag.vocab.cooccur import TermGraph
 from rag.vocab.frames import parse_frame
 
 
@@ -37,45 +38,37 @@ class QualityGate:
         self.min_score = min_score
         self.max_redundancy = max_redundancy
 
-    def evaluate_retrieval(self, query: str, hits: list[RetrievedHit]) -> QualityReport:
-        return _heuristic_retrieval(query, hits, self.min_score)
+    def evaluate_retrieval(
+        self,
+        query: str,
+        hits: list[RetrievedHit],
+        graph: TermGraph | None = None,
+    ) -> QualityReport:
+        return _heuristic_retrieval(query, hits, self.min_score, graph=graph)
 
     def verify_answer(
         self,
         query: str,
         answer: str,
         hits: list[RetrievedHit],
+        graph: TermGraph | None = None,
     ) -> AnswerVerdict:
-        return _heuristic_answer(query, answer, hits, self.max_redundancy)
+        return _heuristic_answer(query, answer, hits, self.max_redundancy, graph=graph)
 
 
-_GENERIC_QUERY = {"aurora"}
-_PEOPLE_ASK = {
-    "funcionarios",
-    "funcionario",
-    "pessoas",
-    "pessoa",
-    "trabalham",
-    "trabalha",
-    "colaboradores",
-    "colaborador",
-    "headcount",
-}
-_PEOPLE_DOC = {"headcount", "colaboradores", "pessoas", "pessoa"}
-
-
-def _term_in_blob(term: str, blob: str) -> bool:
+def _term_in_blob(term: str, blob: str, graph: TermGraph | None = None) -> bool:
     if term in blob:
         return True
-    if term in _PEOPLE_ASK and any(d in blob for d in _PEOPLE_DOC):
-        return True
-    return False
+    if graph is None:
+        return False
+    return any(nb in blob for nb, _w in graph.neighbors.get(term, [])[:8])
 
 
 def _heuristic_retrieval(
     query: str,
     hits: list[RetrievedHit],
     min_score: float,
+    graph: TermGraph | None = None,
 ) -> QualityReport:
     if not hits:
         return QualityReport(
@@ -85,14 +78,17 @@ def _heuristic_retrieval(
             hint="nenhum trecho retornado; tente termos mais específicos",
             reasons=["índice vazio ou query sem match"],
         )
+    frame = parse_frame(query)
     q_terms = [
         t
         for t in unique_terms(query)
-        if t not in FILLER_PT and t not in _GENERIC_QUERY
+        if t not in FILLER_PT
+        and t not in frame.drop
+        and not (graph is not None and graph.is_common(t, max_df=0.15))
     ]
     blob = " ".join(normalize(h.chunk.text) for h in hits)
-    present = [t for t in q_terms if _term_in_blob(t, blob)]
-    missing = [t for t in q_terms if not _term_in_blob(t, blob)]
+    present = [t for t in q_terms if _term_in_blob(t, blob, graph)]
+    missing = [t for t in q_terms if not _term_in_blob(t, blob, graph)]
     coverage = len(present) / max(len(q_terms), 1)
     top = hits[0].rerank_score if hits[0].rerank_score is not None else hits[0].rrf_score
     pair_sims = []
@@ -124,6 +120,7 @@ def _heuristic_answer(
     answer: str,
     hits: list[RetrievedHit],
     max_redundancy: float,
+    graph: TermGraph | None = None,
 ) -> AnswerVerdict:
     if not answer.strip():
         return AnswerVerdict(ok=False, score=0.0, grounded=False, reasons=["resposta vazia"])
@@ -134,14 +131,16 @@ def _heuristic_answer(
     supported = sum(1 for t in a_terms if t in ctx)
     grounded_ratio = supported / len(a_terms)
     ans_blob = normalize(answer)
+    frame = parse_frame(query)
     q_terms = [
         t
         for t in unique_terms(query)
-        if t not in FILLER_PT and t not in _GENERIC_QUERY
+        if t not in FILLER_PT
+        and t not in frame.drop
+        and not (graph is not None and graph.is_common(t, max_df=0.15))
     ]
-    answered = sum(1 for t in q_terms if _term_in_blob(t, ans_blob)) / max(len(q_terms), 1)
+    answered = sum(1 for t in q_terms if _term_in_blob(t, ans_blob, graph)) / max(len(q_terms), 1)
     redundancy = answer_redundancy(answer)
-    frame = parse_frame(query)
     frame_ok = True
     if frame.kind in {"quantity_period", "quantity"}:
         frame_ok = any(ch.isdigit() for ch in answer)
